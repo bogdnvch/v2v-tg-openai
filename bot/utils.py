@@ -14,6 +14,10 @@ from config import config
 ASSISTANCE_COMPLETED_STATUS = "completed"
 
 
+def create_storage():
+    os.makedirs("../storage", exist_ok=True)
+
+
 def voice_to_text(client, voice_message_path):
     with open(voice_message_path, "rb") as voice_file:
         transcription = client.audio.transcriptions.create(
@@ -100,10 +104,10 @@ def get_or_start_thread(client, user_id):
 
 
 def __get_thread(user_id):
-    with shelve.open("threads_db.db") as db:
+    with shelve.open("threads_db") as db:
         return db.get(user_id)
 
 
 def __save_thread_to_db(user_id, thread_id):
-    with shelve.open("threads_db.db", writeback=True) as db:
+    with shelve.open("threads_db", writeback=True) as db:
         db[user_id] = thread_id

@@ -1,3 +1,4 @@
+import os
 import asyncio
 import logging
 
@@ -10,6 +11,7 @@ logging.basicConfig(level=logging.INFO)
 
 bot = Bot(token=config.telegram_api_token)
 dp = Dispatcher(bot=bot)
+os.makedirs("../storage", exist_ok=True)  # creating storage for voice messages
 
 
 async def main():

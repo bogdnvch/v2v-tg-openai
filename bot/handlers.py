@@ -36,7 +36,6 @@ async def handle_voice(message: types.Message):
     ogg_voice_buffered = utils.mp3_to_ogg(mp3_path=answer_mp3_path)
     ogg_voice_buffered = types.BufferedInputFile(ogg_voice_buffered, answer_filename)
     await message.answer_voice(ogg_voice_buffered)
-    # await message.answer_voice("Скоро все будет")
 
 
 def register_handlers(dp: Dispatcher):
