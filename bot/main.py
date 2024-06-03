@@ -3,8 +3,8 @@ import logging
 
 from aiogram import Bot, Dispatcher
 
-from bot.handlers import register_handlers
 from config import config
+from handlers import register_handlers
 
 logging.basicConfig(level=logging.INFO)
 

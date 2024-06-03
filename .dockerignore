@@ -1,0 +1,15 @@
+# Ignore the virtual environment folder
+venv
+# Python cache files
+*.pyc
+__pycache__
+*.pyo
+*.pyd
+.Python
+# Other unnecessary files
+*.log
+# Docker-specific files
+Dockerfile
+# Database
+*.db
+build/

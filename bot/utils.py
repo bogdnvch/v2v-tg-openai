@@ -1,7 +1,10 @@
+import io
 import os
 import time
 import uuid
 import shelve
+import logging
+import subprocess
 
 from aiogram import types
 
@@ -21,16 +24,28 @@ def voice_to_text(client, voice_message_path):
     return transcription.text
 
 
-def text_to_voice(client, text):
+def text_to_mp3(client, text):
     voice = client.audio.speech.create(
         model="tts-1",
         voice="nova",
         input=text
     )
     voice_uuid = uuid.uuid4()
-    save_path = os.path.join(config.storage_dir, "answers", f"answer_{voice_uuid}.mp3")
+    filename = f"answer_{voice_uuid}"
+    save_path = os.path.join(config.storage_dir, f"{filename}.mp3")
     voice.stream_to_file(save_path)
-    return save_path
+    return save_path, filename
+
+
+def mp3_to_ogg(mp3_path):
+    try:
+        with open(mp3_path, "rb") as mp3_file:
+            mp3_io = io.BytesIO(mp3_file.read())
+            ffmpeg_command = ["ffmpeg", "-i", "pipe:0", "-c:a", "libopus", "-f", "ogg", "pipe:1"]
+            result = subprocess.run(ffmpeg_command, input=mp3_io.read(), capture_output=True)
+            return result.stdout
+    except Exception as e:
+        logging.error(f"Error converting file: {e}")
 
 
 def get_answer_from_assistant(client, assistant, thread, question):
@@ -57,7 +72,7 @@ async def save_voice_to_storage(message: types.Message):
     voice = message.voice
     file_info = await message.bot.get_file(voice.file_id)
     download_path = file_info.file_path
-    save_path = os.path.join(config.storage_dir, "voices", f"voice_{voice.file_id}.mp3")
+    save_path = os.path.join(config.storage_dir, f"voice_{voice.file_id}.mp3")
     await message.bot.download_file(download_path, save_path)
     return save_path
 
@@ -68,13 +83,14 @@ def get_or_create_assistant(client):
     else:
         assistant = client.beta.assistants.create(
             name="Voice Assistant",
-            instructions="Ты полезный ассистент. Твоя задача отвечать на вопросы пользователей.",
+            instructions="Ты полезный ассистент. Твоя задача отвечать на вопросы пользователей на русском языке.",
             model="gpt-3.5-turbo"
         )
     return assistant
 
 
 def get_or_start_thread(client, user_id):
+    user_id = str(user_id)
     if thread_id := __get_thread(user_id=user_id):
         thread = client.beta.threads.retrieve(thread_id=thread_id)
     else:
@@ -84,10 +100,10 @@ def get_or_start_thread(client, user_id):
 
 
 def __get_thread(user_id):
-    with shelve.open("threads_db") as db:
+    with shelve.open("threads_db.db") as db:
         return db.get(user_id)
 
 
 def __save_thread_to_db(user_id, thread_id):
-    with shelve.open("threads_db", writeback=True) as db:
+    with shelve.open("threads_db.db", writeback=True) as db:
         db[user_id] = thread_id
