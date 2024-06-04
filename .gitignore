@@ -33,3 +33,4 @@ storage/
 
 # Database
 *.db
+threads_db
