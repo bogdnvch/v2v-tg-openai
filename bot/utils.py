@@ -10,6 +10,9 @@ from aiogram import types
 from config import config
 
 
+ASSISTANCE_COMPLETED_STATUS = "completed"
+
+
 async def voice_to_text(client, voice_message_path):
     with open(voice_message_path, "rb") as voice_file:
         transcription = await client.audio.transcriptions.create(
