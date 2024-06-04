@@ -10,13 +10,6 @@ from aiogram import types
 from config import config
 
 
-ASSISTANCE_COMPLETED_STATUS = "completed"
-ASSISTANCE_INCOMPLETE_STATUS = "incomplete"
-ASSISTANCE_CANCELLED_STATUS = "cancelled"
-ASSISTANCE_FAILED_STATUS = "failed"
-ASSISTANCE_EXPIRED_STATUS = "expired"
-
-
 async def voice_to_text(client, voice_message_path):
     with open(voice_message_path, "rb") as voice_file:
         transcription = await client.audio.transcriptions.create(
