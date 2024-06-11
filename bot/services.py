@@ -8,23 +8,24 @@ from typing import Optional
 
 from aiogram import types as aiogram_types
 from openai import AsyncOpenAI
-from openai.types.beta import Assistant, Thread
+from openai.types.beta import Assistant
 from openai.types.beta.threads import RequiredActionFunctionToolCall, Run
 
 from bot import utils
 from bot.config import config
-from bot.database import requests
 
 
 openai_client = AsyncOpenAI(api_key=config.openai_api_key)
 
 
 class OpenAIClientMixin:
+    """Миксин, используется везде, где нужен клиент опенаи"""
     def __init__(self, client: AsyncOpenAI):
         self.client = client
 
 
 class AssistantService(OpenAIClientMixin):
+    """Сервис для работы с ассистентом"""
 
     assistant_name = "Voice Assistant"
     assistant_prompt = """
@@ -214,6 +215,8 @@ class TextToVoiceOpenAIService(OpenAIClientMixin):
 
 
 class UserValueOpenAIValidator(OpenAIClientMixin):
+    """Сервис для валидации ценности пользователя"""
+
     model = "gpt-4o"
 
     async def is_valid(self, context: str, value_to_validate: str):

@@ -1,5 +1,3 @@
-import json
-
 from aiogram import Dispatcher, Router, types
 from aiogram.filters.command import Command
 from openai import AsyncOpenAI
