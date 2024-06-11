@@ -1,10 +1,13 @@
+import json
+
 from aiogram import Dispatcher, Router, types
 from aiogram.filters.command import Command
 from openai import AsyncOpenAI
 
-import utils
-from config import config
-from database import requests
+from bot.config import config
+from bot.database import requests
+from bot import utils
+from bot.services import AssistantService, VoiceToTextOpenAIService, TextToVoiceOpenAIService
 
 router = Router()
 client = AsyncOpenAI(api_key=config.openai_api_key)
@@ -18,31 +21,25 @@ async def handle_start(message: types.Message):
 
 @router.message(lambda message: message.text)
 async def handle_text(message: types.Message):
+    await requests.update_user_values(telegram_id=563430409, values=["привет"])
     await message.reply("Я так не понимаю, отправляй мне только голосовые сообщения")
 
 
 @router.message(lambda message: message.voice)
 async def handle_voice(message: types.Message):
-    assistant, _ = await utils.get_or_create_assistant(client=client)
+    thread = await utils.get_thread_for_user(tg_user_id=message.from_user.id)
 
-    # formatting user message to the text
-    voice_local_path = await utils.save_voice_to_storage(message=message)
-    message_text = await utils.voice_to_text(client=client, voice_message_path=voice_local_path)
+    message_text = await VoiceToTextOpenAIService(client=client).voice_to_text(message=message)
 
-    thread = await utils.get_or_start_thread(client=client, tg_user_id=message.from_user.id)
-    assistant_answer, is_retrieved = await utils.get_answer_from_assistant(
-        client=client,
-        assistant=assistant,
-        thread=thread,
-        message=message_text
-    )
-    if not is_retrieved:
-        await message.reply(assistant_answer)
-    else:
-        answer_mp3_path, answer_filename = await utils.text_to_mp3(client=client, text=assistant_answer)
-        ogg_voice_buffered = await utils.mp3_to_ogg(mp3_path=answer_mp3_path)
-        ogg_voice_buffered = types.BufferedInputFile(ogg_voice_buffered, answer_filename)
-        await message.answer_voice(ogg_voice_buffered)
+    assistant_service = AssistantService(client=client, thread_id=thread.id, tg_user_id=message.from_user.id)
+    await assistant_service.initialize()
+    answer = await assistant_service.get_answer(message_text=message_text)
+
+    if not answer:
+        await message.reply("Что-то пошло не так, повторите попытку позже")
+
+    ogg_voice = await TextToVoiceOpenAIService(client=client).text_to_voice(text=answer)
+    await message.answer_voice(ogg_voice)
 
 
 def register_handlers(dp: Dispatcher):
