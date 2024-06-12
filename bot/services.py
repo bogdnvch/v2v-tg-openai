@@ -226,21 +226,30 @@ class UserValueOpenAIValidator(OpenAIClientMixin):
     async def _send_openai_request(self, context: str, value_to_validate: str) -> str:
         response = await self.client.chat.completions.create(
             model=self.model,
+            temperature=0.3,
             messages=[
+                {"role": "system",
+                 "content": "You are an AI that validates user-selected values from the context. "
+                            "If the value is a real interest or preference of the user, "
+                            "return `validation_result` as `true`. If the value is incorrectly highlighted or "
+                            "irrelevant, return `validation_result` as `false`."
+                 },
                 {"role": "user", "content": context},
                 {
                     "role": "system",
-                    "content": f"Может ли эта ценность `{value_to_validate}`"
-                               f" быть истинной для пользователя или это просто контекст?"
+                    "content": f"Can this value `{value_to_validate}` be true for the user or is it just a context?"
                 }
             ],
-            functions=[self._function],
-            function_call={
-                "name": self._function["name"],
-                "arguments": json.dumps({"value": {"value_text": value_to_validate}})
+            tools=[{
+                "type": "function",
+                "function": self._function
+            },],
+            tool_choice={
+                "type": "function",
+                "function": {"name": self._function["name"]}
             }
         )
-        valid = json.loads(response.choices[0].message.function_call.arguments)["value"]["validation_result"]
+        valid = json.loads(response.choices[0].message.tool_calls[0].function.arguments)["value"]["validation_result"]
         return valid
 
     @property

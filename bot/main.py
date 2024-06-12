@@ -21,5 +21,4 @@ async def main():
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    # asyncio.run(models.create_table())
     asyncio.run(main())
