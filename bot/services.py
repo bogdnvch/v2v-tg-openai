@@ -270,6 +270,8 @@ class UserValueOpenAIValidator(mixins.OpenAIClientMixin):
 
 
 class ImageRecognitionService(mixins.OpenAIClientMixin, mixins.SaveFileLocallyMixin):
+    """Сервис для распознавания настроения по фото лица пользователя"""
+
     type_of_file = "photo"
 
     async def recognize_mood_by_photo(self, message: aiogram_types.Message):
