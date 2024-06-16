@@ -5,7 +5,12 @@ from openai import AsyncOpenAI
 from bot.config import config
 from bot.database import requests
 from bot import utils
-from bot.services import AssistantService, VoiceToTextOpenAIService, TextToVoiceOpenAIService
+from bot.services import (
+    AssistantService,
+    VoiceToTextOpenAIService,
+    TextToVoiceOpenAIService,
+    ImageRecognitionService
+)
 
 router = Router()
 client = AsyncOpenAI(api_key=config.openai_api_key)
@@ -29,15 +34,26 @@ async def handle_voice(message: types.Message):
 
     message_text = await VoiceToTextOpenAIService(client=client).voice_to_text(message=message)
 
-    assistant_service = AssistantService(client=client, thread_id=thread.id, tg_user_id=message.from_user.id)
-    await assistant_service.initialize()
+    assistant_service = await AssistantService(
+        client=client,
+        thread_id=thread.id,
+        tg_user_id=message.from_user.id
+    ).initialize()
     answer = await assistant_service.get_answer(message_text=message_text)
 
     if not answer:
         await message.reply("Что-то пошло не так, повторите попытку позже")
+        return
 
     ogg_voice = await TextToVoiceOpenAIService(client=client).text_to_voice(text=answer)
     await message.answer_voice(ogg_voice)
+
+
+@router.message(lambda message: message.photo)
+async def handle_image(message: types.Message):
+    service = ImageRecognitionService(client=client)
+    mood_result = await service.recognize_mood_by_photo(message=message)
+    await message.answer(mood_result)
 
 
 def register_handlers(dp: Dispatcher):

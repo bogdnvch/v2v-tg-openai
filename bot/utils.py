@@ -1,3 +1,5 @@
+import base64
+
 from openai.types.beta import Thread
 
 from bot.database import requests
@@ -24,3 +26,8 @@ async def validate_and_save_user_values(context: str, tool_outputs: list[dict], 
         if is_valid:
             validated_values.append(value)
     await requests.update_user_values(telegram_id=tg_user_id, values=validated_values)
+
+
+def encode_image(image_path: str):
+    with open(image_path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode('utf-8')

@@ -11,20 +11,14 @@ from openai import AsyncOpenAI
 from openai.types.beta import Assistant
 from openai.types.beta.threads import RequiredActionFunctionToolCall, Run
 
-from bot import utils
+from bot import utils, mixins
 from bot.config import config
 
 
 openai_client = AsyncOpenAI(api_key=config.openai_api_key)
 
 
-class OpenAIClientMixin:
-    """Миксин, используется везде, где нужен клиент опенаи"""
-    def __init__(self, client: AsyncOpenAI):
-        self.client = client
-
-
-class AssistantService(OpenAIClientMixin):
+class AssistantService(mixins.OpenAIClientMixin):
     """Сервис для работы с ассистентом"""
 
     assistant_name = "Voice Assistant"
@@ -33,7 +27,6 @@ class AssistantService(OpenAIClientMixin):
         ценности в процессе ведения диалога. Вызывай функцию `save_value`, когда найдешь ровно одну ценность.
         Если их несколько, то вызывай функцию несколько раз. Разговаривай в расслабленном неформальном формате.
     """
-    model = "gpt-4o"
 
     assistant: Assistant = None
     thread_id: str
@@ -45,18 +38,17 @@ class AssistantService(OpenAIClientMixin):
         self.tg_user_id = tg_user_id
 
     async def initialize(self):
-        if self.assistant:
-            return
-
-        if config.assistant_id:
-            self.assistant = await self.client.beta.assistants.retrieve(assistant_id=config.assistant_id)
-        else:
-            self.assistant = await self.client.beta.assistants.create(
-                name=self.assistant_name,
-                instructions=self.assistant_prompt,
-                model=self.model,
-                tools=self._tools
-            )
+        if not self.assistant:
+            if config.assistant_id:
+                self.assistant = await self.client.beta.assistants.retrieve(assistant_id=config.assistant_id)
+            else:
+                self.assistant = await self.client.beta.assistants.create(
+                    name=self.assistant_name,
+                    instructions=self.assistant_prompt,
+                    model=self.model,
+                    tools=self._tools
+                )
+        return self
 
     @property
     def _tools(self):
@@ -93,7 +85,7 @@ class AssistantService(OpenAIClientMixin):
             logging.error(f"Unexpected error when trying to get OpenAI response: {e}")
 
 
-class OpenAIAnswerRetrieveService(OpenAIClientMixin):
+class OpenAIAnswerRetrieveService(mixins.OpenAIClientMixin):
     """Сервис получает ответ на заданный вопрос"""
 
     ASSISTANCE_COMPLETED_STATUS = "completed"
@@ -115,6 +107,7 @@ class OpenAIAnswerRetrieveService(OpenAIClientMixin):
             content=message
         )
         self.run = await self.client.beta.threads.runs.create_and_poll(
+            model=self.model,
             thread_id=self.thread_id,
             assistant_id=self.assistant_id,
             poll_interval_ms=1000
@@ -152,41 +145,36 @@ class OpenAIAnswerRetrieveService(OpenAIClientMixin):
         }
 
 
-class VoiceToTextOpenAIService(OpenAIClientMixin):
+class VoiceToTextOpenAIService(mixins.OpenAIClientMixin, mixins.SaveFileLocallyMixin):
     """Сервис переводит сообщение из голоса в текст"""
 
+    model = "whisper-1"
+
     async def voice_to_text(self, message: aiogram_types.Message) -> str:
-        voice_local_path = await self._save_voice_to_storage(message=message)
+        voice_local_path = await self._save_file_to_storage(message=message, type_of_file="voice")
         transcription_message = await self._openai_voice_to_text(voice_message_path=voice_local_path)
         return transcription_message
-
-    @staticmethod
-    async def _save_voice_to_storage(message: aiogram_types.Message) -> str:
-        voice = message.voice
-        file_info = await message.bot.get_file(voice.file_id)
-        download_path = file_info.file_path
-        save_path = os.path.join(config.storage_dir, f"voice_{voice.file_id}.mp3")
-        await message.bot.download_file(download_path, save_path)
-        return save_path
 
     async def _openai_voice_to_text(self, voice_message_path) -> str:
         with open(voice_message_path, "rb") as voice_file:
             transcription = await self.client.audio.transcriptions.create(
-                model="whisper-1",
+                model=self.model,
                 language="ru",
                 file=voice_file
             )
         return transcription.text
 
 
-class TextToVoiceOpenAIService(OpenAIClientMixin):
+class TextToVoiceOpenAIService(mixins.OpenAIClientMixin):
     """Сервис переводит текст в .ogg файл"""
+
+    model = "tts-1"
 
     _generated_filename: str
 
     async def text_to_voice(self, text: str) -> aiogram_types.BufferedInputFile:
         voice = await self.client.audio.speech.create(
-            model="tts-1",
+            model=self.model,
             voice="nova",
             input=text
         )
@@ -214,10 +202,8 @@ class TextToVoiceOpenAIService(OpenAIClientMixin):
             logging.error(f"Error converting file: {e}")
 
 
-class UserValueOpenAIValidator(OpenAIClientMixin):
+class UserValueOpenAIValidator(mixins.OpenAIClientMixin):
     """Сервис для валидации ценности пользователя"""
-
-    model = "gpt-4o"
 
     async def is_valid(self, context: str, value_to_validate: str):
         validation_result = await self._send_openai_request(context=context, value_to_validate=value_to_validate)
@@ -228,13 +214,16 @@ class UserValueOpenAIValidator(OpenAIClientMixin):
             model=self.model,
             temperature=0.3,
             messages=[
-                {"role": "system",
-                 "content": "You are an AI that validates user-selected values from the context. "
+                {
+                    "role": "system",
+                    "content": "You are an AI that validates user-selected values from the context. "
                             "If the value is a real interest or preference of the user, "
                             "return `validation_result` as `true`. If the value is incorrectly highlighted or "
                             "irrelevant, return `validation_result` as `false`."
                  },
-                {"role": "user", "content": context},
+                {
+                    "role": "user", "content": context
+                },
                 {
                     "role": "system",
                     "content": f"Can this value `{value_to_validate}` be true for the user or is it just a context?"
@@ -249,8 +238,9 @@ class UserValueOpenAIValidator(OpenAIClientMixin):
                 "function": {"name": self._function["name"]}
             }
         )
-        valid = json.loads(response.choices[0].message.tool_calls[0].function.arguments)["value"]["validation_result"]
-        return valid
+        results = json.loads(response.choices[0].message.tool_calls[0].function.arguments)
+        if result_value := results.get("value", None):
+            return result_value["validation_result"]
 
     @property
     def _function(self):
@@ -275,5 +265,67 @@ class UserValueOpenAIValidator(OpenAIClientMixin):
                     }
                 },
                 "required": ["value"]
+            }
+        }
+
+
+class ImageRecognitionService(mixins.OpenAIClientMixin, mixins.SaveFileLocallyMixin):
+    type_of_file = "photo"
+
+    async def recognize_mood_by_photo(self, message: aiogram_types.Message):
+        photo_local_path = await self._save_file_to_storage(message=message, type_of_file="photo")
+        base64_image = utils.encode_image(photo_local_path)
+        response = await self.client.chat.completions.create(
+            model=self.model,
+            temperature=0.3,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are an AI assistant with computer vision, "
+                               "your task is to recognize the user’s mood by the face photo. "
+                               "Choose mood result from enum. "
+                               "If you are not sure or its not a human on photo you should return `Unknown`"
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "What’s in this image?"},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpg;base64,{base64_image}",
+                            }
+                        }
+                    ]
+                }
+            ],
+            tools=[{
+                "type": "function",
+                "function": self._function
+            }, ],
+            tool_choice={
+                "type": "function",
+                "function": {"name": self._function["name"]}
+            }
+        )
+        results = json.loads(response.choices[0].message.tool_calls[0].function.arguments)
+        result_mood = results.get("mood", "Unknown")
+        return result_mood
+
+    @property
+    def _function(self):
+        return {
+            "name": "recognize_mood",
+            "description": "Mood recognition by face photo",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "mood": {
+                        "type": "string",
+                        "description": "Mood result",
+                        "enum": ["Anger", "Fear", "Sadness", "Disgust", "Happiness", "Surprise", "Unknown"]
+                    }
+                },
+                "required": ["mood"]
             }
         }
