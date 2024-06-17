@@ -1,5 +1,3 @@
-from concurrent.futures import ThreadPoolExecutor
-
 from aiogram import Dispatcher, Router, types
 from aiogram.filters.command import Command
 from openai import AsyncOpenAI
@@ -23,7 +21,6 @@ from bot.services import (
 
 router = Router()
 client = AsyncOpenAI(api_key=config.openai_api_key)
-executor = ThreadPoolExecutor(max_workers=1)
 
 
 @router.message(Command("start"))

@@ -8,7 +8,7 @@ from bot.config import config
 
 Event = TypeVar("Event", bound=BaseEvent)
 
-executor = ThreadPoolExecutor(max_workers=1)
+executor = ThreadPoolExecutor(max_workers=5)
 
 
 class Ampli:
