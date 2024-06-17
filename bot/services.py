@@ -13,6 +13,10 @@ from openai.types.beta.threads import RequiredActionFunctionToolCall, Run
 
 from bot import utils, mixins
 from bot.config import config
+from bot.ampli import (
+    ValueValidationEvent,
+    PhotoRecognitionEvent
+)
 
 
 openai_client = AsyncOpenAI(api_key=config.openai_api_key)
@@ -205,11 +209,15 @@ class TextToVoiceOpenAIService(mixins.OpenAIClientMixin):
 class UserValueOpenAIValidator(mixins.OpenAIClientMixin):
     """Сервис для валидации ценности пользователя"""
 
-    async def is_valid(self, context: str, value_to_validate: str):
-        validation_result = await self._send_openai_request(context=context, value_to_validate=value_to_validate)
+    async def is_valid(self, context: str, value_to_validate: str, telegram_id: int, ):
+        validation_result = await self._send_openai_request(
+            context=context,
+            value_to_validate=value_to_validate,
+            telegram_id=telegram_id
+        )
         return validation_result == "true"
 
-    async def _send_openai_request(self, context: str, value_to_validate: str) -> str:
+    async def _send_openai_request(self, context: str, value_to_validate: str, telegram_id: int) -> str:
         response = await self.client.chat.completions.create(
             model=self.model,
             temperature=0.3,
@@ -238,6 +246,7 @@ class UserValueOpenAIValidator(mixins.OpenAIClientMixin):
                 "function": {"name": self._function["name"]}
             }
         )
+        await utils.send_event_to_amplitude(user_id=telegram_id, event=ValueValidationEvent())
         results = json.loads(response.choices[0].message.tool_calls[0].function.arguments)
         if result_value := results.get("value", None):
             return result_value["validation_result"]
@@ -252,7 +261,8 @@ class UserValueOpenAIValidator(mixins.OpenAIClientMixin):
                 "properties": {
                     "value": {
                         "type": "object",
-                        "description": "The user's selected value from the context, including its name and possible validation results.",
+                        "description": "The user's selected value from the context, "
+                                       "including its name and possible validation results.",
                         "properties": {
                             "value_text": {"type": "string", "description": "The value text to validate."},
                             "validation_result": {
@@ -291,7 +301,7 @@ class ImageRecognitionService(mixins.OpenAIClientMixin, mixins.SaveFileLocallyMi
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": "What’s in this image?"},
+                        {"type": "text", "text": "Recognize the user's mood."},
                         {
                             "type": "image_url",
                             "image_url": {
@@ -312,6 +322,7 @@ class ImageRecognitionService(mixins.OpenAIClientMixin, mixins.SaveFileLocallyMi
         )
         results = json.loads(response.choices[0].message.tool_calls[0].function.arguments)
         result_mood = results.get("mood", "Unknown")
+        await utils.send_event_to_amplitude(user_id=message.from_user.id, event=PhotoRecognitionEvent())
         return result_mood
 
     @property

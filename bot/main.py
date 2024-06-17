@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.INFO)
 
 bot = Bot(token=config.telegram_api_token)
 dp = Dispatcher(bot=bot)
-os.makedirs("../storage", exist_ok=True)  # creating storage for voice messages
+os.makedirs("../storage", exist_ok=True)  # creating local storage for mp3 and jpg
 
 
 async def main():

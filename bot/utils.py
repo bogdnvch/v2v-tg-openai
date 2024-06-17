@@ -1,9 +1,18 @@
 import base64
+import asyncio
+from typing import Union
 
 from openai.types.beta import Thread
 
 from bot.database import requests
 from bot.services import openai_client, UserValueOpenAIValidator
+from bot.ampli import executor, amplitude, Event
+
+
+async def send_event_to_amplitude(user_id: Union[str, int], event: Event):
+    user_id = str(user_id)
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(executor, amplitude.track, user_id, event)
 
 
 async def get_thread_for_user(tg_user_id: int) -> Thread:
@@ -22,7 +31,7 @@ async def validate_and_save_user_values(context: str, tool_outputs: list[dict], 
     validated_values = []
     validator = UserValueOpenAIValidator(client=openai_client)
     for value in values:
-        is_valid = await validator.is_valid(context=context, value_to_validate=value)
+        is_valid = await validator.is_valid(context=context, value_to_validate=value, telegram_id=tg_user_id)
         if is_valid:
             validated_values.append(value)
     await requests.update_user_values(telegram_id=tg_user_id, values=validated_values)

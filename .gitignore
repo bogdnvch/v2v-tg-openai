@@ -30,7 +30,3 @@ env/
 
 # Storage
 storage/
-
-# Database
-*.db
-threads_db

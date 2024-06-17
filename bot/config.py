@@ -6,6 +6,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     telegram_api_token: str = Field(..., env="TELEGRAM_API_TOKEN")
+    amplitude_api_key: str = Field(..., env="AMPLITUDE_API_KEY")
     openai_api_key: str = Field(..., env="OPENAI_API_KEY")
     assistant_id: Optional[str] = Field(None, env="ASSISTANT_ID")
     storage_dir: str = "../storage"
