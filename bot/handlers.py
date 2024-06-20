@@ -1,5 +1,6 @@
 from aiogram import Dispatcher, Router, types
 from aiogram.filters.command import Command
+from aiogram.fsm.context import FSMContext
 from openai import AsyncOpenAI
 
 from bot.ampli import (
@@ -24,7 +25,8 @@ client = AsyncOpenAI(api_key=config.openai_api_key)
 
 
 @router.message(Command("start"))
-async def handle_start(message: types.Message):
+async def handle_start(message: types.Message, state: FSMContext):
+    print(state)
     await utils.send_event_to_amplitude(user_id=message.from_user.id, event=UserRegistrationEvent())
     await requests.create_user_if_not_exists(telegram_id=message.from_user.id)
     await message.answer("Отправь мне голосовое сообщение")

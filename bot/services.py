@@ -8,7 +8,7 @@ from typing import Optional
 
 from aiogram import types as aiogram_types
 from openai import AsyncOpenAI
-from openai.types.beta import Assistant
+from openai.types.beta import Assistant, VectorStore
 from openai.types.beta.threads import RequiredActionFunctionToolCall, Run
 
 from bot import utils, mixins
@@ -341,4 +341,41 @@ class ImageRecognitionService(mixins.OpenAIClientMixin, mixins.SaveFileLocallyMi
                 },
                 "required": ["mood"]
             }
+        }
+
+
+class AssistantFileSearch(mixins.OpenAIClientMixin):
+
+    assistant_id: str
+
+    _file_names = ["Тревожность.docx"]
+
+    def __init__(self, assistant_id: str, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.assistant_id = assistant_id
+
+    async def update_assistant(self, **kwargs):
+        vector_store = await self._create_vector_store(name="Anxiety")
+        tool_parameters = self._get_file_search_assistant_kwargs(vector_store_id=vector_store.id)
+        assistant = await self.client.beta.assistants.update(
+            assistant_id=self.assistant_id,
+            **tool_parameters
+        )
+        return assistant
+
+    async def _create_vector_store(self, name: str) -> VectorStore:
+        vector_store = await self.client.beta.vector_stores.create(name=name)
+        file_paths = [os.path.join(config.documents_file_search_dir, file_name) for file_name in self._file_names]
+        file_streams = [open(path, "rb") for path in file_paths]
+
+        await self.client.beta.vector_stores.file_batches.upload_and_poll(
+            vector_store_id=vector_store.id,
+            files=file_streams
+        )
+        return vector_store
+
+    @staticmethod
+    def _get_file_search_assistant_kwargs(vector_store_id: str):
+        return {
+            "tool_resources": {"file_search": {"vector_store_ids": [vector_store_id]}}
         }
