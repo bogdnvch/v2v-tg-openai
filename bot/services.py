@@ -12,10 +12,11 @@ from openai import AsyncOpenAI
 from openai.types.beta import Assistant, VectorStore
 from openai.types.beta.threads import RequiredActionFunctionToolCall, Run
 
-from bot import utils, mixins
-from bot.config import config
-from bot.database import requests
-from bot.ampli import (
+import utils
+import mixins
+from config import config
+from database import requests
+from ampli import (
     ValueValidationEvent,
     PhotoRecognitionEvent
 )

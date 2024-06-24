@@ -4,7 +4,7 @@ from typing import Literal, Optional
 from aiogram import types
 from openai import AsyncOpenAI
 
-from bot.config import config
+from config import config
 
 
 class OpenAIClientMixin:

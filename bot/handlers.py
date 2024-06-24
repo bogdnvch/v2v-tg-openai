@@ -3,16 +3,16 @@ from aiogram.filters.command import Command
 from aiogram.fsm.context import FSMContext
 from openai import AsyncOpenAI
 
-from bot.ampli import (
+from ampli import (
     UserRegistrationEvent,
     UserSendTextEvent,
     UserSendVoiceEvent,
     UserSendPhotoEvent,
 )
-from bot.config import config
-from bot.database import requests
-from bot import utils
-from bot.services import (
+from config import config
+from database import requests
+import utils
+from services import (
     AssistantService,
     VoiceToTextOpenAIService,
     TextToVoiceOpenAIService,

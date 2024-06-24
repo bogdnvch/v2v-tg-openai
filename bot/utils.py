@@ -4,9 +4,9 @@ from typing import Union, Optional
 
 from openai.types.beta import Thread
 
-from bot.database import requests
-from bot.services import openai_client, UserValueOpenAIValidator
-from bot.ampli import executor, amplitude, Event
+from database import requests
+from services import openai_client, UserValueOpenAIValidator
+from ampli import executor, amplitude, Event
 
 
 async def send_event_to_amplitude(user_id: Union[str, int], event: Event):

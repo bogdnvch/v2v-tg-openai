@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from amplitude import Amplitude, BaseEvent, EventOptions
 
-from bot.config import config
+from config import config
 
 
 Event = TypeVar("Event", bound=BaseEvent)
