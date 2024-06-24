@@ -10,8 +10,12 @@ class Settings(BaseSettings):
     amplitude_api_key: str = Field(..., env="AMPLITUDE_API_KEY")
     openai_api_key: str = Field(..., env="OPENAI_API_KEY")
     assistant_id: Optional[str] = Field(None, env="ASSISTANT_ID")
+
     storage_dir: str = str(Path(__file__).parent.parent / "storage")
     documents_file_search_dir: str = str(Path(__file__).parent / "documents")
+
+    REDIS_HOST: str = "redis"
+    REDIS_PORT: int = 6379
 
     DB_HOST: str = Field(..., env="DB_HOST")
     DB_PORT: int = Field(..., env="DB_PORT")
@@ -26,6 +30,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+        extra = "ignore"
 
 
 config = Settings()

@@ -10,6 +10,6 @@ RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
 
 COPY . .
 
-RUN alembic upgrade head
-
-CMD ["python", "./bot/main.py"]
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+ENV PYTHONPATH=/app
+ENTRYPOINT ["sh", "/usr/local/bin/entrypoint.sh"]
