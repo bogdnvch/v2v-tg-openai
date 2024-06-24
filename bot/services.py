@@ -1,5 +1,6 @@
 import os
 import io
+import re
 import json
 import uuid
 import logging
@@ -13,6 +14,7 @@ from openai.types.beta.threads import RequiredActionFunctionToolCall, Run
 
 from bot import utils, mixins
 from bot.config import config
+from bot.database import requests
 from bot.ampli import (
     ValueValidationEvent,
     PhotoRecognitionEvent
@@ -27,9 +29,12 @@ class AssistantService(mixins.OpenAIClientMixin):
 
     assistant_name = "Voice Assistant"
     assistant_prompt = """
-        Ты полезный ассистент. Твоя задача задавать вопросы пользователю и искать его ключевые 
-        ценности в процессе ведения диалога. Вызывай функцию `save_value`, когда найдешь ровно одну ценность.
-        Если их несколько, то вызывай функцию несколько раз. Разговаривай в расслабленном неформальном формате.
+        You are a helpful assistant. Your task is to ask questions to the user and identify their key values during the conversation. 
+        Call the `save_value` function when you find exactly one value. If there are multiple values, call the function multiple times. 
+        For questions about 'anxiety', you must use `file_search` to retrieve and quote information from the Vector Store
+        and you’re not allowed to come up with an answer to that, you can only use a file. 
+        Ensure your answers about anxiety are short short short and do not explicitly reference the sources in your responses. 
+        Speak in a relaxed and informal manner.
     """
 
     assistant: Assistant = None
@@ -52,7 +57,15 @@ class AssistantService(mixins.OpenAIClientMixin):
                     model=self.model,
                     tools=self._tools
                 )
+        await self._add_file_search_if_dont_have()
         return self
+
+    async def _add_file_search_if_dont_have(self):
+        file_search_tools = list(filter(lambda tool: tool.type == "file_search", self.assistant.tools))
+        user_vector_store = await utils.get_user_vector_store_id(tg_user_id=self.tg_user_id)
+        if not file_search_tools or not user_vector_store:
+            service = AssistantFileSearch(assistant_id=self.assistant.id, client=self.client)
+            await service.update_assistant(existing_tools=self._tools, tg_user_id=self.tg_user_id)
 
     @property
     def _tools(self):
@@ -137,8 +150,18 @@ class OpenAIAnswerRetrieveService(mixins.OpenAIClientMixin):
 
     async def _extract_answer(self) -> str:
         messages = await self.client.beta.threads.messages.list(thread_id=self.thread_id)
-        new_message = messages.data[0].content[0].text.value
+        text = messages.data[0].content[0].text
+        new_message = text.value
+        if text.annotations:
+            file_id = text.annotations[0].file_citation.file_id
+            file = await openai_client.files.retrieve(file_id)
+            new_message = self._remove_sources(new_message)
+            new_message += f" Answer were taken from {file.filename}"
         return new_message
+
+    @staticmethod
+    def _remove_sources(text: str) -> str:
+        return re.sub(r'【.*?】', "", text)
 
     @staticmethod
     def _get_output_from_tool_call(tool_call: RequiredActionFunctionToolCall) -> dict:
@@ -354,16 +377,19 @@ class AssistantFileSearch(mixins.OpenAIClientMixin):
         super().__init__(*args, **kwargs)
         self.assistant_id = assistant_id
 
-    async def update_assistant(self, **kwargs):
-        vector_store = await self._create_vector_store(name="Anxiety")
-        tool_parameters = self._get_file_search_assistant_kwargs(vector_store_id=vector_store.id)
+    async def update_assistant(self, existing_tools: list, tg_user_id: int):
+        vector_store = await self._create_vector_store(name="Anxiety", tg_user_id=tg_user_id)
+        tool_parameters = self._get_file_search_assistant_kwargs(
+            existing_tools=existing_tools,
+            vector_store_id=vector_store.id
+        )
         assistant = await self.client.beta.assistants.update(
             assistant_id=self.assistant_id,
             **tool_parameters
         )
         return assistant
 
-    async def _create_vector_store(self, name: str) -> VectorStore:
+    async def _create_vector_store(self, name: str, tg_user_id: int) -> VectorStore:
         vector_store = await self.client.beta.vector_stores.create(name=name)
         file_paths = [os.path.join(config.documents_file_search_dir, file_name) for file_name in self._file_names]
         file_streams = [open(path, "rb") for path in file_paths]
@@ -372,10 +398,18 @@ class AssistantFileSearch(mixins.OpenAIClientMixin):
             vector_store_id=vector_store.id,
             files=file_streams
         )
+        await self._save_vector_id_to_db(tg_user_id=tg_user_id, vector_store_id=vector_store.id)
         return vector_store
 
     @staticmethod
-    def _get_file_search_assistant_kwargs(vector_store_id: str):
+    async def _save_vector_id_to_db(tg_user_id: int, vector_store_id: str):
+        user = await requests.get_user_by_telegram_id(telegram_id=tg_user_id)
+        await requests.update_user(user_pk=user.id, added_vector_store_id=vector_store_id)
+
+    @staticmethod
+    def _get_file_search_assistant_kwargs(existing_tools: list, vector_store_id: str):
+        tools = existing_tools + [{"type": "file_search"}]
         return {
+            "tools": tools,
             "tool_resources": {"file_search": {"vector_store_ids": [vector_store_id]}}
         }

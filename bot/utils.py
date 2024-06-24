@@ -1,6 +1,6 @@
 import base64
 import asyncio
-from typing import Union
+from typing import Union, Optional
 
 from openai.types.beta import Thread
 
@@ -24,6 +24,11 @@ async def get_thread_for_user(tg_user_id: int) -> Thread:
         thread = await openai_client.beta.threads.create()
         await requests.update_user(user_pk=user_pk, thread_id=thread.id)
     return thread
+
+
+async def get_user_vector_store_id(tg_user_id: int) -> Optional[str]:
+    user = await requests.get_user_by_telegram_id(telegram_id=tg_user_id)
+    return user.added_vector_store_id
 
 
 async def validate_and_save_user_values(context: str, tool_outputs: list[dict], tg_user_id: int):
