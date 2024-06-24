@@ -14,8 +14,8 @@ class Settings(BaseSettings):
     storage_dir: str = str(Path(__file__).parent.parent / "storage")
     documents_file_search_dir: str = str(Path(__file__).parent / "documents")
 
-    REDIS_HOST: str = "redis"
-    REDIS_PORT: int = 6379
+    REDIS_HOST: str = Field(..., env="REDIS_HOST")
+    REDIS_PORT: int = Field(..., env="REDIS_PORT")
 
     DB_HOST: str = Field(..., env="DB_HOST")
     DB_PORT: int = Field(..., env="DB_PORT")
