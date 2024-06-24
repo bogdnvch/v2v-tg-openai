@@ -15,7 +15,7 @@ async def send_event_to_amplitude(user_id: Union[str, int], event: Event):
     await loop.run_in_executor(executor, amplitude.track, user_id, event)
 
 
-async def get_thread_for_user(tg_user_id: int) -> Thread:
+async def get_or_create_thread_for_user(tg_user_id: int) -> Thread:
     user = await requests.get_user_by_telegram_id(telegram_id=tg_user_id)
     user_pk = user.id
     if user.thread_id:

@@ -18,6 +18,7 @@ from services import (
     TextToVoiceOpenAIService,
     ImageRecognitionService
 )
+from states import UserInfo
 
 
 router = Router()
@@ -25,23 +26,27 @@ client = AsyncOpenAI(api_key=config.openai_api_key)
 
 
 @router.message(Command("start"))
-async def handle_start(message: types.Message, state: FSMContext):
-    print(state)
+async def handle_start(message: types.Message):
     await utils.send_event_to_amplitude(user_id=message.from_user.id, event=UserRegistrationEvent())
     await requests.create_user_if_not_exists(telegram_id=message.from_user.id)
-    await message.answer("Отправь мне голосовое сообщение")
+    await message.answer("Send me voice message")
 
 
 @router.message(lambda message: message.text)
 async def handle_text(message: types.Message):
     await utils.send_event_to_amplitude(user_id=message.from_user.id, event=UserSendTextEvent())
-    await message.reply("Я так не понимаю, отправляй мне только голосовые сообщения")
+    await message.reply("I don’t get it, just send me voice messages")
 
 
 @router.message(lambda message: message.voice)
-async def handle_voice(message: types.Message):
+async def handle_voice(message: types.Message, state: FSMContext):
+    await state.set_state(UserInfo.thread_id)
     await utils.send_event_to_amplitude(user_id=message.from_user.id, event=UserSendVoiceEvent())
-    thread = await utils.get_thread_for_user(tg_user_id=message.from_user.id)
+    thread = await utils.get_or_create_thread_for_user(tg_user_id=message.from_user.id)
+    await state.update_data(thread_id=thread.id)
+    data = await state.get_data()
+    print("Print just to show that thread_id was stored in the state |", data["thread_id"])
+    await state.clear()
     message_text = await VoiceToTextOpenAIService(client=client).voice_to_text(message=message)
     assistant_service = await AssistantService(
         client=client,
@@ -51,7 +56,7 @@ async def handle_voice(message: types.Message):
     answer = await assistant_service.get_answer(message_text=message_text)
 
     if not answer:
-        await message.reply("Что-то пошло не так, повторите попытку позже")
+        await message.reply("Something went wrong, try again later")
         return
 
     ogg_voice = await TextToVoiceOpenAIService(client=client).text_to_voice(text=answer)
