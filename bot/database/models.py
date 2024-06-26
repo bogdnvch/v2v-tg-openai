@@ -19,8 +19,6 @@ class User(Base):
     thread_id: Mapped[str] = mapped_column(unique=True, nullable=True)
     values: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=True)
 
-    added_vector_store_id: Mapped[str] = mapped_column(unique=True, nullable=True)
-
     def __repr__(self):
         return f"<User(telegram_id={self.telegram_id})>"
 

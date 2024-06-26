@@ -26,11 +26,6 @@ async def get_or_create_thread_for_user(tg_user_id: int) -> Thread:
     return thread
 
 
-async def get_user_vector_store_id(tg_user_id: int) -> Optional[str]:
-    user = await requests.get_user_by_telegram_id(telegram_id=tg_user_id)
-    return user.added_vector_store_id
-
-
 async def validate_and_save_user_values(context: str, tool_outputs: list[dict], tg_user_id: int):
     values = [output["output"] for output in tool_outputs]
     validated_values = []

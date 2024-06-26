@@ -63,8 +63,7 @@ class AssistantService(mixins.OpenAIClientMixin):
 
     async def _add_file_search_if_dont_have(self):
         file_search_tools = list(filter(lambda tool: tool.type == "file_search", self.assistant.tools))
-        user_vector_store = await utils.get_user_vector_store_id(tg_user_id=self.tg_user_id)
-        if not file_search_tools or not user_vector_store:
+        if not file_search_tools:
             service = AssistantFileSearch(assistant_id=self.assistant.id, client=self.client)
             await service.update_assistant(existing_tools=self._tools, tg_user_id=self.tg_user_id)
 
@@ -399,13 +398,7 @@ class AssistantFileSearch(mixins.OpenAIClientMixin):
             vector_store_id=vector_store.id,
             files=file_streams
         )
-        await self._save_vector_id_to_db(tg_user_id=tg_user_id, vector_store_id=vector_store.id)
         return vector_store
-
-    @staticmethod
-    async def _save_vector_id_to_db(tg_user_id: int, vector_store_id: str):
-        user = await requests.get_user_by_telegram_id(telegram_id=tg_user_id)
-        await requests.update_user(user_pk=user.id, added_vector_store_id=vector_store_id)
 
     @staticmethod
     def _get_file_search_assistant_kwargs(existing_tools: list, vector_store_id: str):
